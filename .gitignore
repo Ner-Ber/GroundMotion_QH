@@ -3,4 +3,5 @@
 *.code-workspace
 *desktop.ini
 /data/*
+!
 h

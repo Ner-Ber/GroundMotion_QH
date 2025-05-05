@@ -6,3 +6,9 @@
 'scripts' folder should contain analysis code shuch as ipynb notebooks etc.
 'data' folder should contain the data and ignored by git to not be uploaded.
 
+## current setup
+conda install matplotlib numpy scipy pandas
+
+* *cd to project folder*
+
+pip install -e .

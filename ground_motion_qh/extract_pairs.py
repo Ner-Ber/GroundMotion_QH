@@ -1,8 +1,8 @@
 import numpy as np
 
-TW_MINUS = 1
-TW_BUFFER = 1
-TW_PLUS = 10
+TW_MINUS = 10
+TW_BUFFER = 10
+TW_PLUS = 100
 
 
 def create_tw_minus_slices(
@@ -52,11 +52,13 @@ def slices_to_max_amp_pairs(
   a_plus_vector = []
   for i in range(len(tw_minus_slices)):
     try:
-      max_of_minus = np.max(waveform[tw_minus_slices[i]])
+      max_of_minus = np.max(waveform[tw_minus_slices[i]] -
+                            np.mean(waveform[tw_minus_slices[i]]))
     except ValueError:
       max_of_minus = np.nan
     try:
-      max_of_plus = np.max(waveform[tw_plus_slices[i]])
+      max_of_plus = np.max(waveform[tw_plus_slices[i]] -
+                           np.mean(waveform[tw_plus_slices[i]]))
     except ValueError:
       max_of_plus = np.nan
     a_minus_vector.append(max_of_minus)

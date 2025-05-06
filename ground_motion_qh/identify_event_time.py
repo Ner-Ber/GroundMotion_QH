@@ -9,9 +9,9 @@ from obspy import UTCDateTime
 
 def identify_ps_event_time(
     st, #stream
-    pmin=0.5,  # mininum of the probability of p-phase to identify events
-    smin=0.5, # mininum of the probability of s-phase to identify events
-    max_pstime=7 #Threshold of maximum S-P time 
+    pmin=0.5,  # mininum of the probability of p-phase to identify events (0~1)
+    smin=0.5, # mininum of the probability of s-phase to identify events (0~1)
+    max_pstime=7 #Threshold of maximum S-P time (seconds)
 ):
     #define models
     picker = sbm.PickBlue("phasenet")
@@ -49,7 +49,7 @@ def identify_ps_event_time(
             hyp_df.append({
                     "ev_id":ev_id, # index of the events
                     "ptime":ptime, # time of the phases
-                    'pstime':UTCDateTime(row['timestamp'])-UTCDateTime(ptime) # s-p time, propotional to distance
+                    'pstime':UTCDateTime(row['timestamp'])-UTCDateTime(ptime) # s-p time: propotional to distance
                 })
             pflg=0
             ev_id+=1

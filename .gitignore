@@ -3,4 +3,11 @@
 *.code-workspace
 *desktop.ini
 /data/*
+<<<<<<< Updated upstream
 h
+=======
+!data/SND.AZ.HHE.20090324T1200.ms
+!data/SND.AZ.HHN.20090324T1200.ms
+!data/SND.AZ.HHZ.20090324T1200.ms
+
+>>>>>>> Stashed changes

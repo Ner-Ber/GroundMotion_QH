@@ -7,7 +7,7 @@
 'data' folder should contain the data and ignored by git to not be uploaded.
 
 ## current setup
-conda install matplotlib numpy scipy pandas
+conda install matplotlib numpy scipy pandas ipykernel ipython
 
 * *cd to project folder*
 

@@ -4,7 +4,17 @@
 *.code-workspace
 *desktop.ini
 /data/*
+<<<<<<< HEAD
+<<<<<<< Updated upstream
+=======
 !data/SND.AZ.HHE.20090324T1200.ms
 !data/SND.AZ.HHN.20090324T1200.ms
 !data/SND.AZ.HHZ.20090324T1200.ms
+>>>>>>> de1340f149bab5b15724576db78dfb91f7ddff85
 h
+=======
+!data/SND.AZ.HHE.20090324T1200.ms
+!data/SND.AZ.HHN.20090324T1200.ms
+!data/SND.AZ.HHZ.20090324T1200.ms
+
+>>>>>>> Stashed changes

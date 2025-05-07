@@ -113,6 +113,7 @@ def hist_atrigger_aforecast(a_trigger_max, a_forecast_max, bins=100):
     ax[0].set_yscale("log")
     ax[0].set_xscale("log")
     ax[0].set_xlabel('Max ground motion')
+    ax[0].set_ylabel("Frequency")
 
     x_vals = np.linspace(0, 5, bins)
     bin_size = x_vals[1] - x_vals[0]

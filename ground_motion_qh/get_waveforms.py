@@ -42,13 +42,14 @@ def preprocess_waveforms(
     filter: bool = True,
     filter_type: str = 'highpass',
     freq: float = 0.01,
+    output: str = "VEL",  # can be "VEL" or "ACC"
     client=CLIENT,
 ) -> obs.Stream:
   inv = client.get_stations(
       station=stn_waveform_strm[0].meta.station, level="response",
       starttime=stn_waveform_strm[0].meta.starttime, endtime=stn_waveform_strm[0].meta.endtime)
   stn_waveform_strm = stn_waveform_strm.remove_response(inventory=inv, water_level=None,
-                                                        pre_filt=PRE_FILT, output="VEL")
+                                                        pre_filt=PRE_FILT, output=output)
   if detrend:
     stn_waveform_strm.detrend()
   if taper:

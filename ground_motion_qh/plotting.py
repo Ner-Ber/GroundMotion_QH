@@ -120,18 +120,18 @@ def hist_atrigger_aforecast(a_trigger_max, a_forecast_max, bins=100):
         a_forecast_max / a_trigger_max,
         bins=x_vals[:-1] + bin_size / 2,
         label='Original',
-        histtype='step'
+        halpha=0.5
     )
 
     ax[1].hist(
         a_forecast_max_shuffled / a_trigger_max,
         bins=x_vals[:-1] + bin_size / 2,
         label='Shuffled',
-        histtype='step'
+        alpha=0.5
     )
 
     ax[1].set_yscale("log")
-    ax[1].set_xlabel("Max Shake Ratio Interval 1 / Interval 2")
+    ax[1].set_xlabel("Max Shake Ratio Interval 2 / Interval 1")
     ax[1].set_ylabel("Frequency")
     ax[1].legend()
 

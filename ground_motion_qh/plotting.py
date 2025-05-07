@@ -120,7 +120,7 @@ def hist_atrigger_aforecast(a_trigger_max, a_forecast_max, bins=100):
         a_forecast_max / a_trigger_max,
         bins=x_vals[:-1] + bin_size / 2,
         label='Original',
-        halpha=0.5
+        alpha=0.5
     )
 
     ax[1].hist(

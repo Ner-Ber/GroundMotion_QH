@@ -1,9 +1,15 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
+from cycler import cycler
 from scipy.stats import pearsonr
 
+# Define your custom color cycle
+custom_colors = ['#215CAF', '#FACF58', '#8AC6D0', '#C2F5FF']
+
+# Apply it globally
 sns.set(style="whitegrid")
+plt.rc('axes', prop_cycle=cycler(color=custom_colors))
 
 
 def scatter_trigger_vs_forecast(a_trigger_max, a_forecast_max):

@@ -2,10 +2,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 from cycler import cycler
+from matplotlib.colors import LinearSegmentedColormap
 from scipy.stats import gaussian_kde, pearsonr
 
 # Define your custom color cycle
 CUSTOM_COLORS = ['#215CAF', '#FACF58', '#8AC6D0', '#C2F5FF']
+
+qh_cmap = LinearSegmentedColormap.from_list(
+    'qh_cmap', CUSTOM_COLORS[:2], N=256)
 
 # Apply it globally
 sns.set(style="whitegrid")
@@ -19,14 +23,14 @@ def scatter_pre_vs_post(a_pre_max, a_post_max):
     corr_shuffled, p_shuffled = pearsonr(a_pre_max, a_post_max_shuffled)
 
     min_val = np.percentile([*a_pre_max, *a_post_max], 0.00)
-    max_val = np.percentile([*a_pre_max, *a_post_max], 95)
+    max_val = np.percentile([*a_pre_max, *a_post_max], 97)
 
     print(max_val)
 
     fig, axes = plt.subplots(figsize=(9, 4), ncols=2, sharey=True, sharex=True)
 
     data_pairs = [
-        (a_pre_max, a_post_max, 'Original', corr_original, p_original),
+        (a_pre_max, a_post_max, 'Observed', corr_original, p_original),
         (a_pre_max, a_post_max_shuffled, 'Shuffled', corr_shuffled, p_shuffled)
     ]
 
@@ -43,7 +47,7 @@ def scatter_pre_vs_post(a_pre_max, a_post_max):
         zi = kde(np.vstack([xi.ravel(), yi.ravel()])).reshape(xi.shape)
 
         # Plot contour
-        contour = ax.contour(10**xi, 10**yi, zi, levels=10, cmap="inferno")
+        contour = ax.contour(10**xi, 10**yi, zi, levels=10, cmap='inferno')
         if ax == axes[0]:
             # ax.clabel(contour, inline=True, fontsize=8, fmt='%.1f')
             ax.scatter(a_pre_max, a_post_max, s=0.1, c='k')
@@ -54,12 +58,15 @@ def scatter_pre_vs_post(a_pre_max, a_post_max):
         ax.plot([min_val, max_val], [min_val, max_val],
                 'k--', lw=1, label='x = y')
 
-        ax.set_title(f"{title_prefix}, Corr = {corr:.2f}, p={p_val:.2f}")
+        ax.set_title(
+            f"{title_prefix}, Correlation={corr:.2f}, p={p_val:.2f}")
         ax.set_xscale("log")
         ax.set_yscale("log")
-        ax.set_xlabel(r'$A_{pre}$')
+        ax.set_xlabel(r'$PGA_{event}$ [m/s]')
         if ax == axes[0]:
-            ax.set_ylabel(r'$A_{post}$')
+            ax.set_ylabel(r'$PGA_{after}$ [m/s]')
+        # include minor grid
+        ax.grid(which='minor', linestyle='--', linewidth=0.3)
 
         ax.set_xlim(min_val, max_val)
         ax.set_ylim(min_val, max_val)
@@ -69,21 +76,30 @@ def scatter_pre_vs_post(a_pre_max, a_post_max):
 
 def scatter_post_ratio_vs_apre(a_pre_max, a_post_max):
 
-    fig, axes = plt.subplots(figsize=(10, 3), ncols=2)
+    fig, axes = plt.subplots(figsize=(10, 5), ncols=2, tight_layout=True)
+    alpha = 0.5
+
     ax = axes[0]
-    ax.scatter(a_pre_max, a_post_max, s=2)
-    ax.plot([0, 1], [0, 1], transform=ax.transAxes, color='k', linestyle='--')
-    ax.set_xlabel(r'$A_{pre}$')
-    ax.set_ylabel(r'$A_{post}$')
+    ax.scatter(a_pre_max, a_post_max, s=2, alpha=alpha)
+    xmin, xmax = ax.get_xlim()
+    ax.plot([xmin, xmax], [xmin, xmax],
+            color='k', linestyle='--')
+    ax.set_xlabel(r'$PGA_{event}$ [m/s]')
+    ax.set_ylabel(r'$PGA_{after}$ [m/s]')
+    # include minor grid
+    ax.grid(which='minor', linestyle='--', linewidth=0.3)
 
     ax.set_xscale("log")
     ax.set_yscale("log")
 
     ax = axes[1]
-    ax.scatter(a_pre_max, a_post_max/a_pre_max, s=2)
+    ax.scatter(a_pre_max, a_post_max/a_pre_max, s=2, alpha=alpha)
     ax.axhline(1, color='k', linestyle='--')
-    ax.set_xlabel(r'$A_{pre}$')
-    ax.set_ylabel(r'$A_{post}$ / $A_{pre}$')
+    ax.set_xlabel(r'$PGA_{event}$ [m/s]')
+    ax.set_ylabel(r'$PGA_{after}$ / $PGA_{event}$')
+
+    # include minor grid
+    ax.grid(which='minor', linestyle='--', linewidth=0.3)
 
     ax.set_xscale("log")
     ax.set_yscale("log")
@@ -118,7 +134,7 @@ def exceedance_plot(a_pre_max, a_post_max, n_roll=100):
     ax.plot(
         a_pre_max[n_start:n_end],
         np.array(rolling_ratio),
-        label='Original'
+        label='Observed'
     )
     ax.plot(
         a_pre_max[n_start:n_end],
@@ -134,10 +150,13 @@ def exceedance_plot(a_pre_max, a_post_max, n_roll=100):
         color=CUSTOM_COLORS[1],
         linewidth=0,
     )
+    # include minor grid
+    ax.grid(which='minor', linestyle='--', linewidth=0.3)
+
     plt.xscale("log")
-    plt.xlabel(r'$A_{pre}$')
-    plt.ylabel(r'P($A_{post}$ > $A_{pre}$)')
-    plt.title(r'Probability that $A_{post}$ > $A_{pre}$')
+    plt.xlabel(r'$PGA_{event}$ [m/s]')
+    plt.ylabel(r'Exceedance Probability')
+    plt.title(r'Probability that $PGA_{after}$ exceeds $PGA_{event}$')
     plt.legend()
 
     return fig, ax
@@ -157,13 +176,13 @@ def hist_apre_apost(a_pre_max, a_post_max, bins=100):
         bins
     )
     ax[0].hist(a_pre_max, bins=log_bins, alpha=0.5,
-               label='Pre interval')
+               label='Event Period')
     ax[0].hist(a_post_max, bins=log_bins, alpha=0.5,
-               label='Post interval')
+               label='After-Event Period')
     ax[0].legend()
     ax[0].set_yscale("log")
     ax[0].set_xscale("log")
-    ax[0].set_xlabel('Max Amplitude')
+    ax[0].set_xlabel("PGA [m/s]")
     ax[0].set_ylabel("Frequency")
 
     x_vals = np.linspace(0, 5, bins)
@@ -171,7 +190,7 @@ def hist_apre_apost(a_pre_max, a_post_max, bins=100):
     ax[1].hist(
         a_post_max / a_pre_max,
         bins=x_vals[:-1] + bin_size / 2,
-        label='Original',
+        label='Observed',
         alpha=0.5
     )
 
@@ -183,9 +202,13 @@ def hist_apre_apost(a_pre_max, a_post_max, bins=100):
     )
 
     ax[1].set_yscale("log")
-    ax[1].set_xlabel(r"$A_{post}$ / $A_{pre}$")
+    ax[1].set_xlabel(r"$PGA_{after}$ / $PGA_{event}$")
     ax[1].set_ylabel("Frequency")
     ax[1].legend()
+
+    for axi in ax:
+        # include minor grid
+        axi.grid(which='minor', linestyle='--', linewidth=0.3)
 
     return fig, ax
 
@@ -229,15 +252,18 @@ def box_plot_shake_ratio_vs_apre(
     for i, length in enumerate(lengths):
         if length == 0:
             ax.text(log10_bin_positions[i], y_text_pos,
-                    'N=0', ha='center', va='bottom', fontsize=12)
+                    'N=0', ha='center', va='bottom', fontsize=8)
         else:
             ax.text(log10_bin_positions[i], y_text_pos, 'N={}'.format(length),
-                    ha='center', va='bottom', fontsize=12)
+                    ha='center', va='bottom', fontsize=8)
     ax.set_yscale("log")
     ax.set_xlim(log10_bin_positions[0] - bin_size,
                 log10_bin_positions[-1] + bin_size)
-    ax.set_xlabel(r"$\log_{10} (A_{pre})$")
-    ax.set_ylabel(r"$\log_{10} (A_{post}/A_{pre})$")
+    ax.set_xlabel(r"$\log_{10} (PGA_{event})$ [$\log_{10}$ (m/s)]")
+    ax.set_ylabel(r"$\log_{10} \left(\frac{PGA_{after}}{PGA_{event}}\right)$")
+
+    # include minor grid
+    ax.grid(which='minor', linestyle='--', linewidth=0.3)
 
     # only show first two entries of legend
     handles, labels = ax.get_legend_handles_labels()

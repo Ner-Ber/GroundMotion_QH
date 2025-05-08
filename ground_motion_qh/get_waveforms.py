@@ -28,10 +28,11 @@ def get_stream_multiple_stations(
 ) -> dict[str, obs.Stream]:
   station_streams = {}
   for stn in station_list:
-    stn_waveform = obs.Stream()
-    for i, comp in enumerate(['HHE', 'HHN', 'HHZ']):
-      stn_waveform += client.get_waveforms(network, str(stn), "*", str(comp), t1, t2)
-    station_streams[stn] = stn_waveform
+    station_streams[stn] = client.get_waveforms(network, str(stn), "*", 'HH*', t1, t2)
+    # stn_waveform = obs.Stream()
+    # for i, comp in enumerate(['HHE', 'HHN', 'HHZ']):
+    #   stn_waveform += client.get_waveforms(network, str(stn), "*", str(comp), t1, t2)
+    # station_streams[stn] = stn_waveform
   return station_streams
 
 
@@ -39,21 +40,23 @@ def preprocess_waveforms(
     stn_waveform_strm: obs.Stream,
     detrend: bool = True,
     taper: bool = True,
+    remove_response: bool = True,
     filter: bool = True,
     filter_type: str = 'highpass',
     freq: float = 0.01,
     output: str = "VEL",  # can be "VEL" or "ACC"
     client=CLIENT,
 ) -> obs.Stream:
-  inv = client.get_stations(
-      station=stn_waveform_strm[0].meta.station, level="response",
-      starttime=stn_waveform_strm[0].meta.starttime, endtime=stn_waveform_strm[0].meta.endtime)
-  stn_waveform_strm = stn_waveform_strm.remove_response(inventory=inv, water_level=None,
-                                                        pre_filt=PRE_FILT, output=output)
   if detrend:
     stn_waveform_strm.detrend()
   if taper:
     stn_waveform_strm.taper(max_percentage=0.05)
+  if remove_response:
+    inv = client.get_stations(
+        station=stn_waveform_strm[0].meta.station, level="response",
+        starttime=stn_waveform_strm[0].meta.starttime, endtime=stn_waveform_strm[0].meta.endtime)
+    stn_waveform_strm = stn_waveform_strm.remove_response(inventory=inv, water_level=None,
+                                                          pre_filt=PRE_FILT, output=output)
   if filter:
     stn_waveform_strm.filter(filter_type, freq=freq)
   return stn_waveform_strm

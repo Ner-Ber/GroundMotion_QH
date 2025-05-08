@@ -18,6 +18,7 @@ from .utils import (
     EARTH_RADIUS_KM,
     get_xyz_from_lonlat,
 )
+import utm
 
 base_dir = Path(__file__).parents[2]
 
@@ -714,5 +715,19 @@ class Catalog:
         """
         self.catalog.to_csv(filename, columns=columns, index=False)
 
+    def get_utm_from_lonlat(self, lon: np.ndarray, lat: np.ndarray) -> np.ndarray:
+        """
+        Convert longitude and latitude to UTM coordinates.
 
+        Args:
+            lon: Longitude values in degrees.
+            lat: Latitude values in degrees.
+
+        Returns:
+            tuple: A tuple of (EASTING, NORTHING, ZONE_NUMBER, ZONE_LETTER).
+        """
+        
+        EASTING, NORTHING, ZONE_NUMBER, ZONE_LETTER = utm.from_latlon(lat, lon)
+        
+        return (EASTING, NORTHING, ZONE_NUMBER, ZONE_LETTER)
 # %%

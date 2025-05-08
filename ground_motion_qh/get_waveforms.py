@@ -28,11 +28,7 @@ def get_stream_multiple_stations(
 ) -> dict[str, obs.Stream]:
   station_streams = {}
   for stn in station_list:
-    station_streams[stn] = client.get_waveforms(network, str(stn), "*", 'HH*', t1, t2)
-    # stn_waveform = obs.Stream()
-    # for i, comp in enumerate(['HHE', 'HHN', 'HHZ']):
-    #   stn_waveform += client.get_waveforms(network, str(stn), "*", str(comp), t1, t2)
-    # station_streams[stn] = stn_waveform
+    station_streams[stn] = client.get_waveforms(network, str(stn), "*", "HH*", t1, t2)
   return station_streams
 
 

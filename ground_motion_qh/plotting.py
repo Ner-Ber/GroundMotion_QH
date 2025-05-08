@@ -16,7 +16,7 @@ sns.set(style="whitegrid")
 plt.rc('axes', prop_cycle=cycler(color=CUSTOM_COLORS))
 
 
-def scatter_pre_vs_post(a_pre_max, a_post_max):
+def scatter_pre_vs_post(a_pre_max, a_post_max, add_corr=True):
     a_post_max_shuffled = np.random.permutation(a_post_max)
 
     corr_original, p_original = pearsonr(a_pre_max, a_post_max)
@@ -58,8 +58,11 @@ def scatter_pre_vs_post(a_pre_max, a_post_max):
         ax.plot([min_val, max_val], [min_val, max_val],
                 'k--', lw=1, label='x = y')
 
-        ax.set_title(
-            f"{title_prefix}, Correlation={corr:.2f}, p={p_val:.2f}")
+        if add_corr:
+            ax.set_title(
+                f"{title_prefix}, Correlation={corr:.2f}, p={p_val:.2f}")
+        else:
+            ax.set_title(f"{title_prefix}")
         ax.set_xscale("log")
         ax.set_yscale("log")
         ax.set_xlabel(r'$PGA_{event}$ [m/s]')
@@ -113,6 +116,7 @@ def exceedance_plot(a_pre_max, a_post_max, n_roll=100):
     a_post_max = a_post_max[sort_a_minus]
 
     ratios = a_post_max/a_pre_max
+    mean_ratio = np.mean(ratios > 1)
     rolling_ratio = [(((ratios) > 1)[i: i+n_roll]).mean()
                      for i in np.arange(len(a_post_max)-n_roll)]
 
@@ -136,6 +140,12 @@ def exceedance_plot(a_pre_max, a_post_max, n_roll=100):
         np.array(rolling_ratio),
         label='Observed'
     )
+    ax.axhline(
+        mean_ratio,
+        color='k',
+        linestyle='--',
+        label='Mean (Obs.): {:.0f}%'.format(mean_ratio*100)
+    )
     ax.plot(
         a_pre_max[n_start:n_end],
         np.array(rolling_ratio_shuffled),
@@ -150,6 +160,7 @@ def exceedance_plot(a_pre_max, a_post_max, n_roll=100):
         color=CUSTOM_COLORS[1],
         linewidth=0,
     )
+
     # include minor grid
     ax.grid(which='minor', linestyle='--', linewidth=0.3)
 

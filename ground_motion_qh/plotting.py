@@ -19,8 +19,10 @@ plt.rc('axes', prop_cycle=cycler(color=CUSTOM_COLORS))
 def scatter_pre_vs_post(a_pre_max, a_post_max, add_corr=True):
     a_post_max_shuffled = np.random.permutation(a_post_max)
 
-    corr_original, p_original = pearsonr(a_pre_max, a_post_max)
-    corr_shuffled, p_shuffled = pearsonr(a_pre_max, a_post_max_shuffled)
+    corr_original, p_original = pearsonr(
+        np.log10(a_pre_max), np.log10(a_post_max))
+    corr_shuffled, p_shuffled = pearsonr(
+        np.log10(a_pre_max), np.log10(a_post_max_shuffled))
 
     min_val = np.percentile([*a_pre_max, *a_post_max], 0.00)
     max_val = np.percentile([*a_pre_max, *a_post_max], 97)

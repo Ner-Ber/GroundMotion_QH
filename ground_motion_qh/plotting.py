@@ -24,7 +24,7 @@ def scatter_pre_vs_post(a_pre_max, a_post_max, add_corr=True):
     corr_shuffled, p_shuffled = pearsonr(
         np.log10(a_pre_max), np.log10(a_post_max_shuffled))
 
-    min_val = np.percentile([*a_pre_max, *a_post_max], 0.00)
+    min_val = np.percentile([*a_pre_max, *a_post_max], 3)
     max_val = np.percentile([*a_pre_max, *a_post_max], 97)
 
     print(max_val)
@@ -62,14 +62,14 @@ def scatter_pre_vs_post(a_pre_max, a_post_max, add_corr=True):
 
         if add_corr:
             ax.set_title(
-                f"{title_prefix}, Correlation={corr:.2f}, p={p_val:.2f}")
+                f"{title_prefix}, Correlation={corr:.2f}, p={p_val:.4f}")
         else:
             ax.set_title(f"{title_prefix}")
         ax.set_xscale("log")
         ax.set_yscale("log")
-        ax.set_xlabel(r'$PGA_{event}$ [m/s]')
+        ax.set_xlabel(r'$PGV_{event}$ [m/s]')
         if ax == axes[0]:
-            ax.set_ylabel(r'$PGA_{after}$ [m/s]')
+            ax.set_ylabel(r'$PGV_{after}$ [m/s]')
         # include minor grid
         ax.grid(which='minor', linestyle='--', linewidth=0.3)
 
@@ -89,8 +89,8 @@ def scatter_post_ratio_vs_apre(a_pre_max, a_post_max):
     xmin, xmax = ax.get_xlim()
     ax.plot([xmin, xmax], [xmin, xmax],
             color='k', linestyle='--')
-    ax.set_xlabel(r'$PGA_{event}$ [m/s]')
-    ax.set_ylabel(r'$PGA_{after}$ [m/s]')
+    ax.set_xlabel(r'$PGV_{event}$ [m/s]')
+    ax.set_ylabel(r'$PGV_{after}$ [m/s]')
     # include minor grid
     ax.grid(which='minor', linestyle='--', linewidth=0.3)
 
@@ -100,8 +100,8 @@ def scatter_post_ratio_vs_apre(a_pre_max, a_post_max):
     ax = axes[1]
     ax.scatter(a_pre_max, a_post_max/a_pre_max, s=2, alpha=alpha)
     ax.axhline(1, color='k', linestyle='--')
-    ax.set_xlabel(r'$PGA_{event}$ [m/s]')
-    ax.set_ylabel(r'$PGA_{after}$ / $PGA_{event}$')
+    ax.set_xlabel(r'$PGV_{event}$ [m/s]')
+    ax.set_ylabel(r'$PGV_{after}$ / $PGV_{event}$')
 
     # include minor grid
     ax.grid(which='minor', linestyle='--', linewidth=0.3)
@@ -167,9 +167,9 @@ def exceedance_plot(a_pre_max, a_post_max, n_roll=100):
     ax.grid(which='minor', linestyle='--', linewidth=0.3)
 
     plt.xscale("log")
-    plt.xlabel(r'$PGA_{event}$ [m/s]')
+    plt.xlabel(r'$PGV_{event}$ [m/s]')
     plt.ylabel(r'Exceedance Probability')
-    plt.title(r'Probability that $PGA_{after}$ exceeds $PGA_{event}$')
+    plt.title(r'Probability that $PGV_{after}$ exceeds $PGV_{event}$')
     plt.legend()
 
     return fig, ax
@@ -195,7 +195,7 @@ def hist_apre_apost(a_pre_max, a_post_max, bins=100):
     ax[0].legend()
     ax[0].set_yscale("log")
     ax[0].set_xscale("log")
-    ax[0].set_xlabel("PGA [m/s]")
+    ax[0].set_xlabel("PGV [m/s]")
     ax[0].set_ylabel("Frequency")
 
     x_vals = np.linspace(0, 5, bins)
@@ -215,7 +215,7 @@ def hist_apre_apost(a_pre_max, a_post_max, bins=100):
     )
 
     ax[1].set_yscale("log")
-    ax[1].set_xlabel(r"$PGA_{after}$ / $PGA_{event}$")
+    ax[1].set_xlabel(r"$PGV_{after}$ / $PGV_{event}$")
     ax[1].set_ylabel("Frequency")
     ax[1].legend()
 
@@ -272,8 +272,8 @@ def box_plot_shake_ratio_vs_apre(
     ax.set_yscale("log")
     ax.set_xlim(log10_bin_positions[0] - bin_size,
                 log10_bin_positions[-1] + bin_size)
-    ax.set_xlabel(r"$\log_{10} (PGA_{event})$ [$\log_{10}$ (m/s)]")
-    ax.set_ylabel(r"$\log_{10} \left(\frac{PGA_{after}}{PGA_{event}}\right)$")
+    ax.set_xlabel(r"$\log_{10} (PGV_{event})$ [$\log_{10}$ (m/s)]")
+    ax.set_ylabel(r"$\log_{10} \left(\frac{PGV_{after}}{PGV_{event}}\right)$")
 
     # include minor grid
     ax.grid(which='minor', linestyle='--', linewidth=0.3)

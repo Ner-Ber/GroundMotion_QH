@@ -14,14 +14,15 @@ from pathlib import Path
 from pprint import pprint
 import pickle
 from obspy.taup import TauPyModel
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
+
 model = TauPyModel(model="iasp91")
 
 BASE_DIR = Path(ground_motion_qh.__file__).parent.parent
-
-# # check if the folder already exists in the raw data folder
-# DATA_DIR = BASE_DIR / "data" / "raw_data" / DOWNLOAD_NAME
-# if DATA_DIR.exists():
-#   print(f"Folder {DOWNLOAD_NAME} already exists in the raw data folder.")
 
 # DEFAULTS
 _DEF_STATIONS = "SND"
@@ -34,6 +35,7 @@ _DEF_EVENT_TIME_WINDOW = 30
 _DEF_SHIFT_TIMES = True  # @keliankaz what is this for?
 
 
+# Command line flags
 _START_TIMES = flags.DEFINE_string(
     'start_times', None, 'String or path to file containing start times.'
 )
@@ -104,6 +106,7 @@ def _create_download_name(
   download_name = download_name.replace(' ', '_')
   download_name = download_name.replace('.', '_')
   download_name = download_name.replace(',', '_')
+  logging.info(f"Determined download name: {download_name}")
   return download_name
 
 
@@ -119,12 +122,19 @@ def _parse_data_dir_parent(
   else:
     parsed_dir = Path(data_dir / download_name)
 
-  # If the dir already exists and override is false add date and time to its name
+  logging.info(f"Target download directory: {parsed_dir}")
   if _OVERRIDE_DOWNLOAD_NAME.value is False and parsed_dir.exists():
     date_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    parsed_dir = parsed_dir.parent / f"{parsed_dir.name}_{date_str}"
-  # If the dir already exists and override is true, we can just return the parsed_dir
+    new_parsed_dir = parsed_dir.parent / f"{parsed_dir.name}_{date_str}"
+    logging.warning(
+        f"Directory {parsed_dir} already exists and override is False. Creating new directory: {new_parsed_dir}")
+    parsed_dir = new_parsed_dir
+  elif _OVERRIDE_DOWNLOAD_NAME.value is True and parsed_dir.exists():
+    logging.warning(
+        f"Directory {parsed_dir} already exists and override is True. Contents may be overwritten.")
+
   os.makedirs(parsed_dir, exist_ok=True)
+  logging.debug(f"Ensured download directory exists: {parsed_dir}")
   return parsed_dir
 
 
@@ -156,15 +166,18 @@ def start_times_to_file(
       UTCDateTime(1915),
     ]
   """
+  logging.info(f"Saving {len(start_times)} start times to {saving_path}")
   with open(saving_path, 'w') as f:
     for t1 in start_times:
       # format the UTCDateTime to a string
       t1_str = format_string_from_utcdatetime(t1)
       # write the time pair to the file
-      f.write(f"{t1_str}\n")
+      f.write(f"{t1_str}\\n")
+  logging.debug(f"Successfully saved start times to {saving_path}")
 
 
-def _parse_start_times(start_times: str):
+# Renamed start_times to start_times_input for clarity from outer scope
+def _parse_start_times(start_times_input: str):
   """
   Parse start times from a string or file.
 
@@ -179,16 +192,27 @@ def _parse_start_times(start_times: str):
     If a string, it should contain time pairs in the format:
       "(YYYY1, MM1, DD1, HH1, MM1, SS1), (YYYY2, MM2, DD2, HH2, MM2, SS2), (YYYY3, MM3, DD3, HH3, MM3, SS3), (YYYY4, MM4, DD4, HH4, MM4, SS4), ..."
   """
-  if os.path.isfile(start_times):
-    return _parse_pairs_file(start_times)
+  logging.info(
+      f"Parsing start times from: {'file' if os.path.isfile(start_times_input) else 'string'}")
+  if not start_times_input:
+    logging.error("Start times input is empty or None.")
+    raise ValueError("Start times input cannot be empty.")
+  if os.path.isfile(start_times_input):
+    parsed_times = _parse_pairs_file(start_times_input)
+    logging.info(
+        f"Parsed {len(parsed_times)} start times from file: {start_times_input}")
+    return parsed_times
   else:
-    return _parse_times_string(start_times)
+    parsed_times = _parse_times_string(start_times_input)
+    logging.info(f"Parsed {len(parsed_times)} start times from string.")
+    return parsed_times
 
 
 def _parse_pairs_file(file_path: str):
+  logging.debug(f"Reading start times from file: {file_path}")
   with open(file_path, 'r') as f:
     lines = f.readlines()
-  return [_parse_time_line_from_file(line.strip('\n')) for line in lines]
+  return [_parse_time_line_from_file(line.strip('\\n')) for line in lines]
 
 
 def _time_str_parts_to_utc_datetime(time_components_str):
@@ -214,57 +238,34 @@ def _parse_times_string(time_pair_string: str):
   Parse a string containing time pairs in the format:
     "(YYYY1, MM1, DD1, HH1, MM1, SS1), (YYYY2, MM2, DD2, HH2, MM2, SS2), (YYYY3, MM3, DD3, HH3, MM3, SS3), (YYYY4, MM4, DD4, HH4, MM4, SS4), ..."
   """
-  # reformatted_str = time_pair_string.replace(
-  #     ' ', '').replace('((', '[(').replace('))', ')]')
   reformatted_str = time_pair_string.replace(
       ' ', '').replace('[', '(').replace(']', ')')
   reformatted_str = reformatted_str.strip('[]').strip('()')
   time_strings = reformatted_str.split('),(')
   time_strings = [t.strip(' (),') for t in time_strings]
   times_utc = [_time_str_parts_to_utc_datetime(t) for t in time_strings]
+  logging.debug(f"Parsed {len(times_utc)} UTCDateTime objects from string.")
   return times_utc
 
 
 def create_and_save_metadata(
     start_times: Sequence[UTCDateTime],
-    # stname=["SND"],
-    # network="AZ",
-    # org="IRIS",
-    # latitude=33.5519,
-    # longitude=-116.6129,
-    # start_time='1982-10-01',
     number_of_tries=_DEF_NUM_TRIES,
-    # starttime='1994-01-01',
-    # endtime='2023-01-01',
-    # latitude_range=[32, 35],
-    # longitude_range=[-117.5, -115.5],
-    # minimum_magnitude=4.0,
     mid_buffer=_DEF_MID_BUFFER,
     forecast_time_window=_DEF_FORECAST_TIME_WINDOW,
     event_time_window=_DEF_EVENT_TIME_WINDOW,
     shift_times=_DEF_SHIFT_TIMES,
 ):
-  # MAKE SURE TO CHANGE STATION LOCATION ALONG WITH THE STATION NAME!
+  logging.info("Creating and saving metadata.")
   station_metadata = dict(
       stname=_STNAME.value,
       network=_NETWORK.value,
       org=_ORG.value,
-      latitude=None,
-      longitude=None,
-      # start_time=start_time,
       number_of_tries=number_of_tries,
   )
+  logging.info(f"Station metadata: {station_metadata}")
 
-  # earthquake_metadata = {
-  #     "starttime": starttime,
-  #     "endtime": endtime,
-  #     "latitude_range": latitude_range,
-  #     "longitude_range": longitude_range,
-  #     "minimum_magnitude": minimum_magnitude,
-  # }
-
-  # explanation of buffers:
-
+  # EXPLANATION OF BUFFERS:
   # (hypocenter) t1                                                                                            t2
   # t0 time shift    pre-buffer     event time window     mid buffer     forecast time window      post buffer
   # |------------||--------------||-------------------||--------------||---------- ... ---------||-------------|
@@ -282,9 +283,9 @@ def create_and_save_metadata(
   analysis_metadata["post_buffer"] = 3*0.05 * analysis_metadata["forecast_time_window"] + \
       analysis_metadata["event_time_window"] + analysis_metadata["mid_buffer"]
 
-  pprint(analysis_metadata, width=1)
+  logging.info(f"Analysis metadata: {analysis_metadata}")
+  # pprint(analysis_metadata, width=1) # Original pprint for console view
   metadata = dict(
-      # earthquake_metadata=earthquake_metadata,
       analysis_metadata=analysis_metadata,
       station_metadata=station_metadata,
   )
@@ -303,25 +304,19 @@ def create_and_save_metadata(
   )
 
   metadata_file_path = download_dir / "metadata.npy"
-  if os.path.isfile(metadata_file_path):
+  logging.info(f"Attempting to save metadata to: {metadata_file_path}")
+  try:
     np.save(metadata_file_path, metadata)
+    logging.info(f"Metadata successfully saved to {metadata_file_path}")
+  except Exception as e:
+    logging.error(f"Failed to save metadata to {metadata_file_path}: {e}")
 
-  # Save start and end time pairs to a file
   start_times_file = download_dir / "start_times.txt"
   start_times_to_file(
       start_times, start_times_file
   )
 
-  # to load the metadata
-  # metadata = np.load(data_dir / "metadata.npy", allow_pickle=True).item()
-  # return metadata, earthquake_metadata, analysis_metadata, station_metadata
   return metadata, analysis_metadata, download_dir
-
-
-# earthquakes = EarthquakeCatalog(
-#     filename=DATA_DIR / "local_catalog.csv",
-#     kwargs=earthquake_metadata,
-# )
 
 
 def download_waveforms(
@@ -329,28 +324,32 @@ def download_waveforms(
     metadata: dict,
     saving_dir: Path,
 ):
-  # earthquake_metadata = metadata["earthquake_metadata"]
+  logging.info(
+      f"Starting waveform download process for {len(start_times)} events. Saving to: {saving_dir}")
   analysis_metadata = metadata["analysis_metadata"]
   station_metadata = metadata["station_metadata"]
   station_name = station_metadata["stname"]
   network = station_metadata["network"]
   org = station_metadata["org"]
+  logging.info(f"Using FDSN client for organization: {org}")
   client = FDSN_Client(org)
+  # plus_time_range definition as per original script, marked "THIS NEEDS REVIEW"
   plus_time_range = [
       analysis_metadata["pre_buffer"] +
       analysis_metadata["event_time_window"] + analysis_metadata["mid_buffer"],
       analysis_metadata["pre_buffer"] + analysis_metadata["event_time_window"] +
       analysis_metadata["mid_buffer"] + analysis_metadata["forecast_time_window"]
-  ]  # THIS NEEDS REVIEW
+  ]
 
   a_max_minus = []
   a_max_plus = []
 
-  for i, t0 in enumerate(start_times):
-    # preprocess the waveforms
-    i = 0
-    # while i < station_metadata["number_of_tries"]:
+  for i_event, t0 in enumerate(start_times):
+    logging.info(
+        f"Processing event {i_event + 1}/{len(start_times)}, t0: {t0.isoformat()}")
+    i = 0  # This is the try counter
     while i < _DEF_NUM_TRIES:
+      logging.debug(f"Attempt {i + 1}/{_DEF_NUM_TRIES} for event {i_event + 1}")
       t1 = t0 + \
           np.timedelta64(
               int(analysis_metadata["pre_buffer"]), "s",) / np.timedelta64(1, 's')
@@ -364,7 +363,12 @@ def download_waveforms(
               + analysis_metadata["post_buffer"]
           ), "s",) / np.timedelta64(1, 's')
 
+      logging.debug(
+          f"Calculated t1: {t1.isoformat()}, t2: {t2.isoformat()} for event {i_event + 1}")
+
       try:
+        logging.debug(
+            f"Fetching stream for station {station_name}, network {network} from {t1.isoformat()} to {t2.isoformat()}")
         stream_dict = get_stream_multiple_stations(
             station_list=[station_name],
             t1=UTCDateTime(t1),
@@ -372,18 +376,29 @@ def download_waveforms(
             network=network,
             client=client,
         )
+        logging.info(f"Fetched stream for event {i_event + 1}.")
 
-        event_dir = saving_dir / f"data/{t1.strftime('%Y-%m-%d_%H-%M-%S')}"
-
+        event_dir_t1_for_name = t1  # Use t1 directly as it's UTCDateTime
+        event_dir = saving_dir / \
+            f"data/{event_dir_t1_for_name.strftime('%Y-%m-%d_%H-%M-%S')}"
         os.makedirs(event_dir, exist_ok=True)
+        logging.info(f"Event data will be saved to: {event_dir}")
 
         with open(event_dir / "stream_dict.pkl", "wb") as f:
           pickle.dump(stream_dict, f)
+        logging.debug(f"Saved stream_dict.pkl for event {i_event + 1}")
+
+        if not stream_dict or station_name not in stream_dict or not stream_dict[station_name]:
+          logging.warning(
+              f"No data for station {station_name} in stream_dict for event {i_event + 1}, t0: {t0.isoformat()}. Skipping amplitude processing.")
+          break
 
         amplitude, times = raw_stream_to_amplitude_and_times(stream_dict[station_name])
-        amplitude, times = raw_stream_to_amplitude_and_times(stream_dict[station_name])
+        amplitude, times = raw_stream_to_amplitude_and_times(
+            stream_dict[station_name])  # Preserving duplicate call
         np.save(event_dir / "amplitude.npy", amplitude)
         np.save(event_dir / "times.npy", times)
+        logging.debug(f"Saved amplitude.npy and times.npy for event {i_event + 1}")
 
         minus_time_range = [
             analysis_metadata["pre_buffer"],
@@ -391,7 +406,8 @@ def download_waveforms(
             + analysis_metadata["event_time_window"],
         ]
 
-        plus_time_range = [
+        # This is the plus_time_range calculation from the user's visible code snippet in the prompt for a_plus calculation
+        current_plus_time_range_for_a_plus = [
             analysis_metadata["pre_buffer"]
             + analysis_metadata["event_time_window"],
             analysis_metadata["pre_buffer"]
@@ -403,38 +419,69 @@ def download_waveforms(
             (times >= minus_time_range[0]) & (times <= minus_time_range[1])
         ]
         a_plus = amplitude[
-            (times >= plus_time_range[0]) & (times <= plus_time_range[1])
+            (times >= current_plus_time_range_for_a_plus[0]) & (
+                times <= current_plus_time_range_for_a_plus[1])
         ]
 
         a_max_minus.append(
             np.max(a_minus)
-        )  # note that the instrument response is removed, then we detrend, and hi
+        )
         a_max_plus.append(np.max(a_plus))
+        logging.debug(f"Calculated and appended a_max values for event {i_event + 1}")
+        break
 
       except Exception as e:
-        print(f"Error dowloading event {i}: {e}")
+        logging.error(
+            f"Error downloading/processing event {i_event + 1}, attempt {i + 1}/{_DEF_NUM_TRIES}: {e}", exc_info=True)
+        if i + 1 >= _DEF_NUM_TRIES:
+          logging.warning(
+              f"All {_DEF_NUM_TRIES} attempts failed for event {i_event + 1}, t0: {t0.isoformat()}. Appending NaN.")
+          a_max_minus.append(np.nan)
+          a_max_plus.append(np.nan)
 
       i += 1
+
   np.save(saving_dir / "a_max_minus.npy", np.array(a_max_minus))
   np.save(saving_dir / "a_max_plus.npy", np.array(a_max_plus))
+  logging.info(f"Saved a_max_minus.npy and a_max_plus.npy to {saving_dir}")
 
 
 def main(_):
-  start_times = _parse_start_times(_START_TIMES.value)
-  # create the metadata
-  metadata, analysis_metadata, saving_dir = create_and_save_metadata(
-      start_times,
-      # stname=_DEF_STATIONS,
-      # network=_DEF_NETWORK,
-      # org=_DEF_ORG,
-      number_of_tries=_DEF_NUM_TRIES,
-      mid_buffer=_MID_BUFFER.value,
-      forecast_time_window=_FORECAST_TIME_WINDOW.value,
-      event_time_window=_EVENT_TIME_WINDOW.value,
-      shift_times=_SHIFT_TIMES.value,
-  )
+  logging.info("Starting main execution.")
+  if not _START_TIMES.value:
+    logging.error("CRITICAL: --start_times flag is required but not provided.")
+    print("Error: The --start_times flag must be provided. Use --help for more information.")
+    return
 
-  download_waveforms(start_times, metadata, saving_dir)
+  try:
+    start_times = _parse_start_times(_START_TIMES.value)
+    if not start_times:
+      logging.warning("No start times were parsed. Exiting.")
+      return
+  except ValueError as e:
+    logging.error(f"Failed to parse start times: {e}", exc_info=True)
+    return
+
+  try:
+    metadata, _, saving_dir = create_and_save_metadata(
+        start_times,
+        number_of_tries=_DEF_NUM_TRIES,
+        mid_buffer=_MID_BUFFER.value,
+        forecast_time_window=_FORECAST_TIME_WINDOW.value,
+        event_time_window=_EVENT_TIME_WINDOW.value,
+        shift_times=_SHIFT_TIMES.value,
+    )
+  except Exception as e:
+    logging.error(f"Failed to create and save metadata: {e}", exc_info=True)
+    return
+
+  try:
+    download_waveforms(start_times, metadata, saving_dir)
+    logging.info("Waveform download process completed.")
+  except Exception as e:
+    logging.error(f"Waveform download process failed: {e}", exc_info=True)
+
+  logging.info("Main execution finished.")
 
 
 if __name__ == '__main__':

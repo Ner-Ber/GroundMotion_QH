@@ -26,6 +26,9 @@ def get_stream_multiple_stations(
     network: str = NETWORK,
     client=CLIENT
 ) -> dict[str, obs.Stream]:
+  """
+  Get waveforms for multiple stations in a given time range.
+  """
   station_streams = {}
   for stn in station_list:
     station_streams[stn] = client.get_waveforms(network, str(stn), "*", "HH*", t1, t2)

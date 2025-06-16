@@ -1,3 +1,28 @@
+"""Download and preprocess waveforms for specified times.
+
+Example usage, from terminal:
+# activate python env for this project 
+
+$ conda activate ground_motion_qh
+
+# run the script from terminal. An example:
+# (Only 'start_times' is required, all other flags are optional)
+
+$ python3 ./ground_motion_qh/download_data.py \
+  --start_times='(2023, 10, 1, 0, 0, 0), (2024, 3, 7, 15, 20, 55), ' \
+  --data_dir='path/to/data/parent/dir' \
+  --override_download_name=False \
+  --name_prefix='ANZA' \
+  --mid_buffer=20 \
+  --forecast_time_window=14400 \
+  --event_time_window=30 \
+  --shift_times=True \
+  --station='SND' \
+  
+
+
+"""
+
 import datetime
 from typing import Sequence
 from absl import app

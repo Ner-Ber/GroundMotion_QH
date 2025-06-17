@@ -28,15 +28,13 @@ from typing import Sequence
 from absl import app
 from absl import flags
 import numpy as np
+import obspy as obs
 from obspy import UTCDateTime
 from obspy.clients.fdsn import Client as FDSN_Client
-from matplotlib import pyplot as plt
 import ground_motion_qh
-from ground_motion_qh.earthquake import EarthquakeCatalog
-from ground_motion_qh.get_waveforms import get_stream_multiple_stations, raw_stream_to_amplitude_and_times
+from ground_motion_qh import get_waveforms
 import os
 from pathlib import Path
-from pprint import pprint
 import pickle
 from obspy.taup import TauPyModel
 import logging
@@ -358,113 +356,83 @@ def download_waveforms(
   org = station_metadata["org"]
   logging.info(f"Using FDSN client for organization: {org}")
   client = FDSN_Client(org)
-  # plus_time_range definition as per original script, marked "THIS NEEDS REVIEW"
-  plus_time_range = [
-      analysis_metadata["pre_buffer"] +
-      analysis_metadata["event_time_window"] + analysis_metadata["mid_buffer"],
-      analysis_metadata["pre_buffer"] + analysis_metadata["event_time_window"] +
-      analysis_metadata["mid_buffer"] + analysis_metadata["forecast_time_window"]
+
+  minus_time_range = [
+      analysis_metadata["pre_buffer"],
+      analysis_metadata["pre_buffer"]
+      + analysis_metadata["event_time_window"],
   ]
+  plus_time_range = [
+      analysis_metadata["pre_buffer"]
+      + analysis_metadata["event_time_window"]
+      + analysis_metadata["mid_buffer"],
+      analysis_metadata["pre_buffer"]
+      + analysis_metadata["event_time_window"]
+      + analysis_metadata["mid_buffer"]
+      + analysis_metadata["forecast_time_window"],
+  ]
+
+  time_paris = []
+  for i_event, t1 in enumerate(start_times):
+    # create pairs for t1 and t2
+    t2 = t1 + np.timedelta64(
+        int(
+            analysis_metadata["pre_buffer"]
+            + analysis_metadata["event_time_window"]
+            + analysis_metadata["mid_buffer"]
+            + analysis_metadata["forecast_time_window"]
+            + analysis_metadata["post_buffer"]
+        ), "s",) / np.timedelta64(1, 's')
+    time_paris.append((UTCDateTime(t1), UTCDateTime(t2)))
+  waveforms_bulk = get_waveforms.get_bulk_streams_single_station(
+      station=station_name,
+      time_pairs=time_paris,
+      network=network,
+      client=client,
+  )
 
   a_max_minus = []
   a_max_plus = []
+  checked_starttimes = set()
+  for i_event, wave_form in enumerate(waveforms_bulk):
+    starttime = wave_form.meta.starttime
+    if starttime.timestamp in checked_starttimes:
+      continue
+    checked_starttimes.add(starttime.timestamp)
+    all_components_st = obs.Stream(
+        [wf for wf in waveforms_bulk if wf.meta.starttime == starttime])
 
-  for i_event, t0 in enumerate(start_times):
-    logging.info(
-        f"Processing event {i_event + 1}/{len(start_times)}, t0: {t0.isoformat()}")
-    i = 0  # This is the try counter
-    while i < _DEF_NUM_TRIES:
-      logging.debug(f"Attempt {i + 1}/{_DEF_NUM_TRIES} for event {i_event + 1}")
-      t1 = t0 + \
-          np.timedelta64(
-              int(analysis_metadata["pre_buffer"]), "s",) / np.timedelta64(1, 's')
+    event_dir = saving_dir / \
+        f"data/{starttime.strftime('%Y-%m-%d_%H-%M-%S')}"
+    os.makedirs(event_dir, exist_ok=True)
+    logging.info(f"Event data will be saved to: {event_dir}")
 
-      t2 = t1 + np.timedelta64(
-          int(
-              analysis_metadata["pre_buffer"]
-              + analysis_metadata["event_time_window"]
-              + analysis_metadata["mid_buffer"]
-              + analysis_metadata["forecast_time_window"]
-              + analysis_metadata["post_buffer"]
-          ), "s",) / np.timedelta64(1, 's')
+    # with open(event_dir / "stream.pkl", "wb") as f:
+    # pickle.dump(stream_dict, f)
+    # logging.debug(f"Saved stream_dict.pkl for event {i_event + 1}")
+    all_components_st.write(event_dir / "stream.mseed", format="MSEED")
+    logging.debug(f"Saved stream.mseed for event {i_event + 1}")
 
-      logging.debug(
-          f"Calculated t1: {t1.isoformat()}, t2: {t2.isoformat()} for event {i_event + 1}")
+    amplitude, times = get_waveforms.raw_stream_to_amplitude_and_times(
+        all_components_st
+    )
+    np.save(event_dir / "amplitude.npy", amplitude)
+    np.save(event_dir / "times.npy", times)
+    logging.debug(f"Saved amplitude.npy and times.npy for event {i_event + 1}")
 
-      try:
-        logging.debug(
-            f"Fetching stream for station {station_name}, network {network} from {t1.isoformat()} to {t2.isoformat()}")
-        stream_dict = get_stream_multiple_stations(
-            station_list=[station_name],
-            t1=UTCDateTime(t1),
-            t2=UTCDateTime(t2),
-            network=network,
-            client=client,
-        )
-        logging.info(f"Fetched stream for event {i_event + 1}.")
+    a_minus = amplitude[
+        (times >= minus_time_range[0]) & (times <= minus_time_range[1])
+    ]
+    a_plus = amplitude[
+        (times >= plus_time_range[0]) & (
+            times <= plus_time_range[1])
+    ]
 
-        event_dir_t1_for_name = t1  # Use t1 directly as it's UTCDateTime
-        event_dir = saving_dir / \
-            f"data/{event_dir_t1_for_name.strftime('%Y-%m-%d_%H-%M-%S')}"
-        os.makedirs(event_dir, exist_ok=True)
-        logging.info(f"Event data will be saved to: {event_dir}")
-
-        with open(event_dir / "stream_dict.pkl", "wb") as f:
-          pickle.dump(stream_dict, f)
-        logging.debug(f"Saved stream_dict.pkl for event {i_event + 1}")
-
-        if not stream_dict or station_name not in stream_dict or not stream_dict[station_name]:
-          logging.warning(
-              f"No data for station {station_name} in stream_dict for event {i_event + 1}, t0: {t0.isoformat()}. Skipping amplitude processing.")
-          break
-
-        amplitude, times = raw_stream_to_amplitude_and_times(stream_dict[station_name])
-        amplitude, times = raw_stream_to_amplitude_and_times(
-            stream_dict[station_name])  # Preserving duplicate call
-        np.save(event_dir / "amplitude.npy", amplitude)
-        np.save(event_dir / "times.npy", times)
-        logging.debug(f"Saved amplitude.npy and times.npy for event {i_event + 1}")
-
-        minus_time_range = [
-            analysis_metadata["pre_buffer"],
-            analysis_metadata["pre_buffer"]
-            + analysis_metadata["event_time_window"],
-        ]
-
-        # This is the plus_time_range calculation from the user's visible code snippet in the prompt for a_plus calculation
-        current_plus_time_range_for_a_plus = [
-            analysis_metadata["pre_buffer"]
-            + analysis_metadata["event_time_window"],
-            analysis_metadata["pre_buffer"]
-            + analysis_metadata["event_time_window"]
-            + analysis_metadata["mid_buffer"],
-        ]
-
-        a_minus = amplitude[
-            (times >= minus_time_range[0]) & (times <= minus_time_range[1])
-        ]
-        a_plus = amplitude[
-            (times >= current_plus_time_range_for_a_plus[0]) & (
-                times <= current_plus_time_range_for_a_plus[1])
-        ]
-
-        a_max_minus.append(
-            np.max(a_minus)
-        )
-        a_max_plus.append(np.max(a_plus))
-        logging.debug(f"Calculated and appended a_max values for event {i_event + 1}")
-        break
-
-      except Exception as e:
-        logging.error(
-            f"Error downloading/processing event {i_event + 1}, attempt {i + 1}/{_DEF_NUM_TRIES}: {e}", exc_info=True)
-        if i + 1 >= _DEF_NUM_TRIES:
-          logging.warning(
-              f"All {_DEF_NUM_TRIES} attempts failed for event {i_event + 1}, t0: {t0.isoformat()}. Appending NaN.")
-          a_max_minus.append(np.nan)
-          a_max_plus.append(np.nan)
-
-      i += 1
+    a_max_minus.append(
+        np.max(a_minus)
+    )
+    a_max_plus.append(np.max(a_plus))
+    logging.debug(f"Calculated and appended a_max values for event {i_event + 1}")
 
   np.save(saving_dir / "a_max_minus.npy", np.array(a_max_minus))
   np.save(saving_dir / "a_max_plus.npy", np.array(a_max_plus))

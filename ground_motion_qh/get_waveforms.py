@@ -1,4 +1,5 @@
 import logging
+from typing import Sequence
 import numpy as np
 from obspy import UTCDateTime
 import obspy as obs
@@ -17,6 +18,37 @@ NETWORK = 'AZ'
 ORG = 'IRIS'
 CLIENT = FDSN_Client(ORG)
 PRE_FILT = [0.001, 0.005, 45, 50]
+
+
+def get_bulk_streams_single_station(
+    station: str = STN_LIST[0],
+    time_pairs: Sequence[tuple[UTCDateTime, UTCDateTime]] = [(T1, T2)],
+    network: str = NETWORK,
+    client=CLIENT
+) -> obs.Stream:
+  """
+  Get waveforms for a single station across multiple time ranges.
+
+  Args:
+    station: Station code
+    time_pairs: Sequence of (start_time, end_time) tuples
+    network: Network code
+    client: FDSN client
+
+  Returns:
+    obspy.Stream object containing the requested waveforms
+  """
+  bulk = []
+  for t1, t2 in time_pairs:
+    bulk.append((network, station, "*", "HH*", t1, t2))
+
+  try:
+    bulk_waveforms = client.get_waveforms_bulk(bulk, attach_response=True)
+    bulk_waveforms = bulk_waveforms.sort(['starttime', 'endtime', 'channel'])
+  except Exception as e:
+    logging.error("Error fetching waveforms: %s", e)
+    bulk_waveforms = obs.Stream()
+  return bulk_waveforms
 
 
 def get_stream_multiple_stations(
@@ -53,11 +85,18 @@ def preprocess_waveforms(
   if filter:
     stn_waveform_strm.filter(filter_type, freq=freq)
   if remove_response:
-    inv = client.get_stations(
-        station=stn_waveform_strm[0].meta.station, level="response",
-        starttime=stn_waveform_strm[0].meta.starttime, endtime=stn_waveform_strm[0].meta.endtime)
-    stn_waveform_strm = stn_waveform_strm.remove_response(inventory=inv, water_level=None,
-                                                          pre_filt=PRE_FILT, output=output)
+    try:
+      stn_waveform_strm = stn_waveform_strm.remove_response(
+          inventory=None, water_level=None, pre_filt=PRE_FILT, output=output)
+    except Exception as e:
+      logging.error(
+          "Error removing response: %s \\n will connect to client to download response", e)
+      # Attempt to fetch inventory if not provided
+      inv = client.get_stations(
+          station=stn_waveform_strm[0].meta.station, level="response",
+          starttime=stn_waveform_strm[0].meta.starttime, endtime=stn_waveform_strm[0].meta.endtime)
+      stn_waveform_strm = stn_waveform_strm.remove_response(
+          inventory=inv, water_level=None, pre_filt=PRE_FILT, output=output)
   if taper:
     stn_waveform_strm.taper(max_percentage=0.05)
   if filter:
@@ -79,7 +118,7 @@ def combine_components(
 
 
 def raw_stream_to_amplitude_and_times(
-    raw_stn_waveform_strm
+    raw_stn_waveform_strm: obs.Stream,
 ) -> tuple[np.ndarray, np.ndarray]:
   stn_waveform_strm_preprcsd = preprocess_waveforms(raw_stn_waveform_strm)
   stn_waveform_strm_amp = combine_components(stn_waveform_strm_preprcsd)

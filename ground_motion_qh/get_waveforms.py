@@ -63,7 +63,7 @@ def get_stream_multiple_stations(
   """
   station_streams = {}
   for stn in station_list:
-    station_streams[stn] = client.get_waveforms(network, str(stn), "*", "HH*", t1, t2)
+    station_streams[stn] = client.get_waveforms(network, str(stn), "*", "HH*", t1, t2,attach_response=True)
   return station_streams
 
 
